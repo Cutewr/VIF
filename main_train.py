@@ -209,9 +209,17 @@ def main(args,config):
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
-    # following timm: set wd as 0 for bias and norm layers
+
+    # following timm: set weightdecay as 0 for bias and norm layers
+    # 为模型的不同参数进行权重衰减
     param_groups = optim_factory.add_weight_decay(model_without_ddp, config["weight_decay"])
+
+    # param_groups：传入包含不同参数组的列表，每个参数组可能有不同的超参数（权重衰减率）
+    # lr=config["lr"]：设置学习率，这个值从配置文件中读取（例如，config["lr"] = 1e-4）。
+    # betas=(0.9, 0.95)：这是Adam优化器的动量参数，betas控制一阶矩估计和二阶矩估计的衰减率，通常设置为(0.9, 0.95)，这对大多数任务而言已经表现很好。
+    # AdamW优化器结合了动量（betas）和自适应学习率（lr），并通过param_groups确保不同参数（如偏置和归一化层）有不同的优化策略（例如，偏置项不使用权重衰减）。
     optimizer = torch.optim.AdamW(param_groups, lr=config["lr"], betas=(0.9, 0.95))
+
     #print(optimizer)
     loss_scaler = NativeScaler()
 
@@ -267,6 +275,7 @@ def main(args,config):
 
 
 if __name__ == '__main__':
+    # 用于定义和返回一个命令行参数解析器（Argument Parser）。
     args = get_args_parser()
     args = args.parse_args()
     with open(args.config_path, 'r') as stream: 
