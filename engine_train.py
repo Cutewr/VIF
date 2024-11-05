@@ -19,7 +19,7 @@ import util.lr_sched as lr_sched
 from util.ema import EMA
 
 
-
+# 一次训练迭代
 def train_one_iter(model,task_index,batch_A,batch_B,device,global_rank,iter_num,optimizer,loss_scaler,ema,train_info,config):
     samples_A = batch_A.to(device, non_blocking=True)
     samples_B = batch_B.to(device, non_blocking=True)
@@ -51,6 +51,7 @@ def train_one_iter(model,task_index,batch_A,batch_B,device,global_rank,iter_num,
     return loss_dict,pred
         
 
+# 训练一个epoch
 def train_one_epoch(model: torch.nn.Module,
                     data_loader_list, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, loss_scaler,
@@ -58,25 +59,49 @@ def train_one_epoch(model: torch.nn.Module,
                     config=None,
                     global_rank=None,
                     ema = None):
+    # 设置模型为训练模式
     model.train(True)
+    # 记录训练中的指标
     metric_logger = misc.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', misc.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 1
     
 
+    # 存储一个训练周期内每个batch的损失值
     loss_chunk_list=[]
+    # 每个训练周期的开始，梯度清零
     optimizer.zero_grad()
 
+    # 打印出 日志的路径
     if log_writer is not None:
         print('log_dir: {}'.format(log_writer.log_dir))
+    # 数据加载器
     data_loader_type = None
+
+    # 可见光编码器、红外编码器 多任务学习
+    # task_dict={"ENV":0,"ENF":1}
     task_dict= {"VIF":0,"MEF":1,"MFF":2}
  
     #The outermost loop requires a fixed data_loader，The default is the first task VIF
-    if config["VIF"]:  
+    # 是否配置了 可见光编码器 任务
+    if config["ENV"]:
         if data_loader_type==None:
+            # 设置数据加载器类型为“VIF”
+            data_loader_type="ENV"
+            # 从data_loader_list中选择数据加载器
+            LoopUsed_loader = data_loader_list["ENV"]
+            LoopUsed_dataset = LoopUsed_loader.dataset
+        else:
+            ENV_data_loader = data_loader_list["ENV"]
+            # 迭代器
+            ENV_data_loader_iter =  iter(ENV_data_loader)
+            ENV_dataset = ENV_data_loader.dataset
+    if config["VIF"]:
+        if data_loader_type==None:
+            # 设置数据加载器类型为“VIF”
             data_loader_type="VIF"
+            # 从data_loader_list中选择数据加载器
             LoopUsed_loader = data_loader_list["VIF"]
             LoopUsed_dataset = LoopUsed_loader.dataset
         else:
@@ -108,11 +133,19 @@ def train_one_epoch(model: torch.nn.Module,
         name_list = ema.getname()
 
     time_start = time.time()
+    # 遍历数据加载器中的数据
+    # metric_logger.log_every() 每隔print_freq步打印一次日志信息
+    # 将训练轮次 header 传递给它
+    # data_iter_step:迭代的batch
+    # samples_rgb：当前批次的可见光数据；smaples_t：当前批次的目标图像；
     for data_iter_step, (samples_rgb, samples_t,rgb_train_info) in enumerate(metric_logger.log_every(LoopUsed_loader, print_freq, header)):
+        # 存储当前迭代中各个任务(VIF、MEF、MFF)计算的损失值
         exist_loss_dict = {}
         # Load all the datasets for the tasks that exist
+        # 如果启用了MEF任务，但是当前没有使用MEF数据加载器
         if config["MEF"] and data_loader_type!="MEF":
             try:
+                # 获取下一个批次的MEF数据
                     samples_oe,samples_ue,MEF_train_info = MEF_data_loader_iter.next()
             except:
                     MEF_data_loader_iter = iter(MEF_data_loader)
@@ -125,10 +158,13 @@ def train_one_epoch(model: torch.nn.Module,
                     MFF_data_loader_iter = iter(MFF_data_loader)
                     samples_far,samples_nxt,MFF_train_info = MFF_data_loader_iter.next()
 
+        # 使用余弦退火策略 调整学习率 args：优化器；当前迭代的相对进度；config
         lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(LoopUsed_loader) + epoch, config)
         
         #Training a VIF iter
         if config["VIF"]:
+            # 进行一次训练迭代【前向传播、误差计算、反向传播】
+            # args: 训练模型、训练任务、
             loss_RGBT,pred= train_one_iter(model,task_dict["VIF"],samples_rgb,samples_t,device,global_rank,[epoch,data_iter_step],optimizer,loss_scaler,ema,rgb_train_info,config)
             exist_loss_dict["RGBT"] = loss_RGBT
             if pred!=None:

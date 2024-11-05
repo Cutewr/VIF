@@ -77,12 +77,18 @@ class MaskedAutoencoderViT(nn.Module):
 
         # --------------------------------------------------------------------------
         #Encoder
+        # 计算相对位置编码
         self.en_relative_position = nn.ModuleList([
+            # 根据窗口形状和头数计算相对位置编码
             Relative_Position_Layer(self.shift_window_shape, num_heads)
+            # 相对位置编码层的数量是网络总深度的一半
             for i in range(depth//2)])
+
         self.blocks = nn.ModuleList([
+            #
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True,  norm_layer=norm_layer,drop_path = self.drop_path)
             for i in range(depth)])
+        # 层归一化
         self.norm = norm_layer(embed_dim)
 
         #Encoder TC-MoA

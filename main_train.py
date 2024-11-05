@@ -153,6 +153,7 @@ def main(args,config):
     # Initialize the  dataloader for each task
     data_loader_list = {}
     if config["VIF"]:
+        # 为VIF任务创建 数据加载器
         data_loader_train_VIF = torch.utils.data.DataLoader(
                 RGBT_dataset, sampler=sampler_train_VIF,
                 batch_size=config["batch_size"],
@@ -220,10 +221,13 @@ def main(args,config):
     # AdamW优化器结合了动量（betas）和自适应学习率（lr），并通过param_groups确保不同参数（如偏置和归一化层）有不同的优化策略（例如，偏置项不使用权重衰减）。
     optimizer = torch.optim.AdamW(param_groups, lr=config["lr"], betas=(0.9, 0.95))
 
-    #print(optimizer)
+    # print(optimizer) 混合精度训练【使用较低精度的浮点数（例如float16）来表示模型权重和梯度，从而加速训练过程并减少显存占用。】
+    # NativeScaler负责缩放（scaling）损失值，以避免在混合精度训练时遇到数值不稳定（例如梯度溢出）的情况。
     loss_scaler = NativeScaler()
 
     # Stabilise training using EMA to prevent NaN
+    # EMA（Exponential Moving Average） 是一种通过指数加权平均的方式来平滑模型的参数
+    # 通常用于模型训练过程中，减少随机波动并提高最终模型的稳定性。
     if config["use_ema"]:
         state_dict = model.state_dict()
         
@@ -249,7 +253,8 @@ def main(args,config):
                 data_loader_train_MEF.sampler.set_epoch(epoch)
             if config["MFF"]:
                 data_loader_train_MFF.sampler.set_epoch(epoch)
-        #Training an epoch
+        # 调用train_one_epoch训练每个epoch，使用当前的数据加载器、优化器、损失函数等训练模型
+        # global_rank:zai
         train_stats = train_one_epoch(
             model, data_loader_list,
             optimizer, device, epoch, loss_scaler,
@@ -275,9 +280,14 @@ def main(args,config):
 
 
 if __name__ == '__main__':
-    # 用于定义和返回一个命令行参数解析器（Argument Parser）。
+    # 用于定义和返回一个命令行参数解析器（Argument Parser）
     args = get_args_parser()
+    # 解析命令行的参数，把参数结果放在args中
     args = args.parse_args()
-    with open(args.config_path, 'r') as stream: 
+    # 读取命令行中的config_path参数，打开config文件
+    with open(args.config_path, 'r') as stream:
+        # yaml.safe_load(stream)：这是 PyYAML 库提供的函数，用于从 stream（即配置文件）中加载 YAML 格式的配置。
+        # yaml.safe_load() 会将 YAML 文件解析成 Python 对象（如字典、列表等）。
+        # 这意味着配置文件内容会被加载到 config 变量中，可以在后续的代码中使用这些配置。
         config = yaml.safe_load(stream)
     main(args,config)

@@ -15,7 +15,6 @@ epochs: 20                 #Total number of training epochs required
 warmup_epochs: 2           #Warm-up epochs
 load_start_epoch: 0        #Only necessary if you need to retrain at breakpoints: read parameters from i-th epoch, to facilitate the calculation of learning rate and other hyperparameters
 
-
 log_dir: ./output/log/     #Path to save the log
 output_dir: ./output/      #Paths to the output model
 output_img_dir: ./output/img/  #Path to output intermediate fusion results
@@ -40,12 +39,20 @@ VIF_dataset_dict:          #Name and path of the datasets to be trained
   LLVIP: /home/yangsun/TC-MoA_Camera_Ready/dataset/train/LLVIP
 arbitrary_input_size: false
 
-MEF: true                  #Whether or not to train the MEF task
+MEF: false                  #Whether or not to train the MEF task
 MEF_dataset_dict:
   SCIE: /home/yangsun/TC-MoA_Camera_Ready/dataset/train/SCIE
 
-MFF: true                  #Whether or not to train the MFF task
+MFF: false                  #Whether or not to train the MFF task
 MFF_dataset_dict:
   RealMFF: /home/yangsun/TC-MoA_Camera_Ready/dataset/train/RealMFF
   MFI-WHU: /home/yangsun/TC-MoA_Camera_Ready/dataset/train/MFI-WHU
 
+# Task setting
+ENV: true
+ENV_dataset_dict:          #Name and path of the datasets to be trained
+  LLVIP: /home/yangsun/TC-MoA_Camera_Ready/dataset/train/LLVIP
+
+ENI: true
+ENI_dataset_dict:          #Name and path of the datasets to be trained
+  LLVIP: /home/yangsun/TC-MoA_Camera_Ready/dataset/train/LLVIP
